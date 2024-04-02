@@ -11,18 +11,20 @@ import (
 
 	ctlconf "carvel.dev/vendir/pkg/vendir/config"
 	ctlfetch "carvel.dev/vendir/pkg/vendir/fetch"
+	ctlcache "carvel.dev/vendir/pkg/vendir/fetch/cache"
 )
 
 type Sync struct {
 	opts       ctlconf.DirectoryContentsHg
 	log        io.Writer
 	refFetcher ctlfetch.RefFetcher
+	cache      ctlcache.Cache
 }
 
 func NewSync(opts ctlconf.DirectoryContentsHg,
-	log io.Writer, refFetcher ctlfetch.RefFetcher) Sync {
+	log io.Writer, refFetcher ctlfetch.RefFetcher, cache ctlcache.Cache) Sync {
 
-	return Sync{opts, log, refFetcher}
+	return Sync{opts, log, refFetcher, cache}
 }
 
 func (d Sync) Desc() string {
@@ -46,13 +48,35 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea) (ctlconf.LockDire
 
 	hg, err := NewHg(d.opts, d.log, d.refFetcher, tempArea)
 	if err != nil {
-		return hgLockConf, err
+		return hgLockConf, fmt.Errorf("Setting up hg: %w", err)
 	}
 	defer hg.Close()
 
-	info, err := hg.Retrieve(incomingTmpPath, tempArea)
+	if cachePath, ok := d.cache.Has("hg", hg.CacheID()); ok {
+		// Sync directly in the cache if needed
+		if !hg.CloneHasTargetRef(cachePath) {
+			if err := hg.SyncClone(cachePath); err != nil {
+				return hgLockConf, fmt.Errorf("Syncing hg cached clone: %w", err)
+			}
+		}
+		// fetch from cachedDir
+		if err := d.cache.CopyFrom("hg", hg.CacheID(), incomingTmpPath); err != nil {
+			return hgLockConf, fmt.Errorf("Extracting cached hg clone: %w", err)
+		}
+	} else {
+		// fetch in the target directory, and save it to cache
+		if err := hg.Clone(incomingTmpPath); err != nil {
+			return hgLockConf, fmt.Errorf("Cloning hg repository: %w", err)
+		}
+		if err := d.cache.Save("hg", hg.CacheID(), incomingTmpPath); err != nil {
+			return hgLockConf, fmt.Errorf("Saving hg repository to cache: %w", err)
+		}
+	}
+
+	// now checkout the wanted revision
+	info, err := hg.Checkout(incomingTmpPath)
 	if err != nil {
-		return hgLockConf, fmt.Errorf("Fetching hg repository: %s", err)
+		return hgLockConf, fmt.Errorf("Checking out hg repository: %s", err)
 	}
 
 	hgLockConf.SHA = info.SHA

@@ -23,17 +23,26 @@ type Hg struct {
 	refFetcher ctlfetch.RefFetcher
 	authDir    string
 	env        []string
+	cacheID    string
 }
 
 func NewHg(opts ctlconf.DirectoryContentsHg,
 	infoLog io.Writer, refFetcher ctlfetch.RefFetcher,
 	tempArea ctlfetch.TempArea,
 ) (*Hg, error) {
-	t := Hg{opts, infoLog, refFetcher, "", nil}
+	t := Hg{opts, infoLog, refFetcher, "", nil, ""}
 	if err := t.setup(tempArea); err != nil {
 		return nil, err
 	}
 	return &t, nil
+}
+
+// CacheID returns a cache id for the repository
+// It doesn't include the ref because we want to reuse a cache when only the ref
+// is changed
+// Basically we combine all data used to write the hgrc file
+func (t *Hg) CacheID() string {
+	return t.cacheID
 }
 
 //nolint:revive
@@ -42,13 +51,46 @@ type HgInfo struct {
 	ChangeSetTitle string
 }
 
-func (t *Hg) Retrieve(dstPath string, tempArea ctlfetch.TempArea) (HgInfo, error) {
-	if len(t.opts.URL) == 0 {
-		return HgInfo{}, fmt.Errorf("Expected non-empty URL")
-	}
-
-	err := t.fetch(dstPath, tempArea)
+// CloneHasTargetRef returns true if the given clone contains the target
+// ref, and this ref is a revision id (not a tag or a branch)
+func (t *Hg) CloneHasTargetRef(dstPath string) bool {
+	out, _, err := t.run([]string{"id", "--id", "-r", t.opts.Ref}, dstPath)
 	if err != nil {
+		return false
+	}
+	out = strings.TrimSpace(out)
+	if strings.HasPrefix(t.opts.Ref, out) {
+		return true
+	}
+	return false
+}
+
+func (t *Hg) Clone(dstPath string) error {
+	if err := t.initClone(dstPath); err != nil {
+		return err
+	}
+	return t.SyncClone(dstPath)
+}
+
+func (t *Hg) SyncClone(dstPath string) error {
+	if _, _, err := t.run([]string{"pull"}, dstPath); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *Hg) LocalClone(localClone, dstPath string) error {
+	if err := t.initClone(dstPath); err != nil {
+		return err
+	}
+	if _, _, err := t.run([]string{"pull", localClone}, dstPath); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *Hg) Checkout(dstPath string) (HgInfo, error) {
+	if _, _, err := t.run([]string{"checkout", t.opts.Ref}, dstPath); err != nil {
 		return HgInfo{}, err
 	}
 
@@ -80,6 +122,10 @@ func (t *Hg) Close() {
 }
 
 func (t *Hg) setup(tempArea ctlfetch.TempArea) error {
+	if len(t.opts.URL) == 0 {
+		return fmt.Errorf("Expected non-empty URL")
+	}
+
 	authOpts, err := t.getAuthOpts()
 	if err != nil {
 		return err
@@ -132,6 +178,7 @@ hgauth.password = %s
 			}
 
 			sshCmd = append(sshCmd, "-i", path, "-o", "IdentitiesOnly=yes")
+			t.cacheID += "private-key=" + *authOpts.PrivateKey + "|"
 		}
 
 		if authOpts.KnownHosts != nil {
@@ -143,6 +190,7 @@ hgauth.password = %s
 			}
 
 			sshCmd = append(sshCmd, "-o", "StrictHostKeyChecking=yes", "-o", "UserKnownHostsFile="+path)
+			t.cacheID += "known-hosts=" + *authOpts.KnownHosts + "|"
 		} else {
 			sshCmd = append(sshCmd, "-o", "StrictHostKeyChecking=no")
 		}
@@ -157,6 +205,7 @@ hgauth.password = %s
 			return fmt.Errorf("Writing %s: %s", hgRcPath, err)
 		}
 		t.env = append(t.env, "HGRCPATH="+hgRcPath)
+		t.cacheID += hgRc
 	}
 
 	return nil

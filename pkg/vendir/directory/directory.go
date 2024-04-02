@@ -119,7 +119,7 @@ func (d *Directory) Sync(syncOpts SyncOpts) (ctlconf.LockDirectory, error) {
 			lockDirContents.Git = &lock
 
 		case contents.Hg != nil:
-			hgSync := ctlhg.NewSync(*contents.Hg, NewInfoLog(d.ui), syncOpts.RefFetcher)
+			hgSync := ctlhg.NewSync(*contents.Hg, NewInfoLog(d.ui), syncOpts.RefFetcher, syncOpts.Cache)
 
 			d.ui.PrintLinef("Fetching: %s + %s (hg from %s)", d.opts.Path, contents.Path, hgSync.Desc())
 
