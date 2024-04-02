@@ -229,27 +229,6 @@ func (t *Hg) initClone(dstPath string) error {
 	return nil
 }
 
-func (t *Hg) fetch(dstPath string, tempArea ctlfetch.TempArea) error {
-	if err := t.initClone(dstPath); err != nil {
-		return err
-	}
-
-	return t.runMultiple([][]string{
-		{"pull"},
-		{"checkout", t.opts.Ref},
-	}, dstPath)
-}
-
-func (t *Hg) runMultiple(argss [][]string, dstPath string) error {
-	for _, args := range argss {
-		_, _, err := t.run(args, dstPath)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (t *Hg) run(args []string, dstPath string) (string, string, error) {
 	var stdoutBs, stderrBs bytes.Buffer
 
