@@ -44,7 +44,11 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea) (ctlconf.LockDire
 
 	defer os.RemoveAll(incomingTmpPath)
 
-	hg := NewHg(d.opts, d.log, d.refFetcher)
+	hg, err := NewHg(d.opts, d.log, d.refFetcher, tempArea)
+	if err != nil {
+		return hgLockConf, err
+	}
+	defer hg.Close()
 
 	info, err := hg.Retrieve(incomingTmpPath, tempArea)
 	if err != nil {
