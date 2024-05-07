@@ -47,12 +47,12 @@ type GitInfo struct {
 	CommitTitle string
 }
 
-func (t *Git) Retrieve(dstPath string, tempArea ctlfetch.TempArea) (GitInfo, error) {
+func (t *Git) Retrieve(dstPath string, tempArea ctlfetch.TempArea, bundle string) (GitInfo, error) {
 	if len(t.opts.URL) == 0 {
 		return GitInfo{}, fmt.Errorf("Expected non-empty URL")
 	}
 
-	err := t.fetch(dstPath, tempArea)
+	err := t.fetch(dstPath, tempArea, bundle)
 	if err != nil {
 		return GitInfo{}, err
 	}
@@ -81,7 +81,7 @@ func (t *Git) Retrieve(dstPath string, tempArea ctlfetch.TempArea) (GitInfo, err
 	return info, nil
 }
 
-func (t *Git) fetch(dstPath string, tempArea ctlfetch.TempArea) error {
+func (t *Git) fetch(dstPath string, tempArea ctlfetch.TempArea, bundle string) error {
 	authOpts, err := t.getAuthOpts()
 	if err != nil {
 		return err
@@ -167,6 +167,10 @@ func (t *Git) fetch(dstPath string, tempArea ctlfetch.TempArea) error {
 	}
 
 	argss = append(argss, []string{"config", "remote.origin.tagOpt", "--tags"})
+
+	if bundle != "" {
+		argss = append(argss, []string{"bundle", "unbundle", bundle})
+	}
 
 	{
 		fetchArgs := []string{"fetch", "origin"}

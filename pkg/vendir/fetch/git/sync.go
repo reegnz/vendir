@@ -4,14 +4,19 @@
 package git
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	ctlconf "carvel.dev/vendir/pkg/vendir/config"
 	ctlfetch "carvel.dev/vendir/pkg/vendir/fetch"
+	ctlcache "carvel.dev/vendir/pkg/vendir/fetch/cache"
 )
+
+const gitCacheType = "git-bundle"
 
 type Sync struct {
 	opts       ctlconf.DirectoryContentsGit
@@ -36,7 +41,7 @@ func (d Sync) Desc() string {
 	return fmt.Sprintf("%s@%s", d.opts.URL, ref)
 }
 
-func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea) (ctlconf.LockDirectoryContentsGit, error) {
+func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea, cache ctlcache.Cache) (ctlconf.LockDirectoryContentsGit, error) {
 	gitLockConf := ctlconf.LockDirectoryContentsGit{}
 
 	incomingTmpPath, err := tempArea.NewTempDir("git")
@@ -46,9 +51,24 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea) (ctlconf.LockDire
 
 	defer os.RemoveAll(incomingTmpPath)
 
+	sum := sha256.New()
+	if _, err := sum.Write([]byte(d.opts.URL)); err != nil {
+		if err != nil {
+			return gitLockConf, err
+		}
+	}
+
+	cacheID := string(sum.Sum(nil))
+
 	git := NewGit(d.opts, d.log, d.refFetcher)
 
-	info, err := git.Retrieve(incomingTmpPath, tempArea)
+	var bundle string
+	if cacheEntry, hasCache := cache.Has(gitCacheType, cacheID); hasCache {
+		bundle = filepath.Join(cacheEntry, "bundle")
+	}
+	fmt.Println("We got cache?", cacheID, bundle)
+
+	info, err := git.Retrieve(incomingTmpPath, tempArea, bundle)
 	if err != nil {
 		return gitLockConf, fmt.Errorf("Fetching git repository: %s", err)
 	}
@@ -56,6 +76,35 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea) (ctlconf.LockDire
 	gitLockConf.SHA = info.SHA
 	gitLockConf.Tags = info.Tags
 	gitLockConf.CommitTitle = d.singleLineCommitTitle(info.CommitTitle)
+
+	if os.Getenv("VENDIR_CACHE_DIR") != "" {
+		// attempt to save a bundle to the cache
+		bundleDir, err := tempArea.NewTempDir("bundleCache")
+		if err != nil {
+			return gitLockConf, err
+		}
+		defer os.RemoveAll(bundleDir)
+		bundle := filepath.Join(bundleDir, "bundle")
+		// get all refs
+
+		out, _, err := git.cmdRunner.Run([]string{"for-each-ref", "--format=%(refname)"}, nil, incomingTmpPath)
+		if err != nil {
+			return gitLockConf, err
+		}
+		var refs []string
+		for _, ref := range strings.Split(string(out), "\n") {
+			ref = strings.TrimSpace(ref)
+			if ref != "" {
+				refs = append(refs, ref)
+			}
+		}
+		if _, _, err := git.cmdRunner.Run(append([]string{"bundle", "create", bundle}, refs...), nil, incomingTmpPath); err != nil {
+			return gitLockConf, err
+		}
+		if err := cache.Save(gitCacheType, cacheID, bundleDir); err != nil {
+			return gitLockConf, err
+		}
+	}
 
 	err = os.RemoveAll(dstPath)
 	if err != nil {
