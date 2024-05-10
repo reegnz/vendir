@@ -182,7 +182,6 @@ hgauth.password = %s
 			}
 
 			sshCmd = append(sshCmd, "-i", path, "-o", "IdentitiesOnly=yes")
-			cacheID += "private-key=" + *authOpts.PrivateKey + "|"
 		}
 
 		if authOpts.KnownHosts != nil {
@@ -194,7 +193,6 @@ hgauth.password = %s
 			}
 
 			sshCmd = append(sshCmd, "-o", "StrictHostKeyChecking=yes", "-o", "UserKnownHostsFile="+path)
-			cacheID += "known-hosts=" + *authOpts.KnownHosts + "|"
 		} else {
 			sshCmd = append(sshCmd, "-o", "StrictHostKeyChecking=no")
 		}
@@ -209,7 +207,6 @@ hgauth.password = %s
 			return fmt.Errorf("Writing %s: %s", hgRcPath, err)
 		}
 		t.env = append(t.env, "HGRCPATH="+hgRcPath)
-		cacheID += hgRc
 	}
 
 	sha := sha256.Sum256([]byte(cacheID))
