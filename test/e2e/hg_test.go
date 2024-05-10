@@ -34,13 +34,9 @@ type hgVendirOutput struct {
 func loadHgAssetInfo(t *testing.T, filename string) HgAssetInfo {
 	t.Helper()
 	f, err := os.Open(filename)
-	if err != nil {
-		t.Fatalf("could not open file %s: %s", filename, err)
-	}
+	require.NoError(t, err, "could not open file %s", filename)
 	var info HgAssetInfo
-	if err := json.NewDecoder(f).Decode(&info); err != nil {
-		t.Fatalf("could not parse file %s: %s", filename, err)
-	}
+	require.NoError(t, json.NewDecoder(f).Decode(&info), "could not parse file %s", filename)
 	return info
 }
 
@@ -52,15 +48,11 @@ func TestHgCache(t *testing.T) {
 	_ = Vendir{t, env.BinaryPath, logger}
 
 	hgSrcPath, err := os.MkdirTemp("", "vendir-e2e-hg-cache")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(hgSrcPath)
 
 	out, err := exec.Command("tar", "xzvf", "assets/hg-repos/asset.tgz", "-C", hgSrcPath).CombinedOutput()
-	if err != nil {
-		t.Fatalf("Unpacking hg-repos asset: %s (output: '%s')", err, out)
-	}
+	require.NoError(t, err, "Unpacking hg-repos asset, output: '%s'", out)
 
 	info := loadHgAssetInfo(t, path.Join(hgSrcPath, "info.json"))
 
@@ -88,7 +80,7 @@ directories:
 
 	var stdout bytes.Buffer
 	stdoutDec := json.NewDecoder(&stdout)
-	//defer os.RemoveAll(dstPath)
+
 	logger.Section("initial clone", func() {
 		stdout.Truncate(0)
 		vendir.RunWithOpts(
@@ -140,9 +132,7 @@ directories:
 		"--repository", filepath.Join(hgSrcPath, "/repo"),
 		filepath.Join(hgSrcPath, info.ExtraBundle),
 	).CombinedOutput()
-	if err != nil {
-		t.Fatalf("Unpacking hg-repos asset: %s (output: '%s')", err, out)
-	}
+	require.NoError(t, err, "Unpacking hg-repos asset, output: '%s'", out)
 
 	logger.Section("sync from cache + pull", func() {
 		stdout.Truncate(0)
