@@ -53,18 +53,21 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea) (ctlconf.LockDire
 	defer hg.Close()
 
 	if cachePath, ok := d.cache.Has("hg", hg.CacheID()); ok {
-		// Sync directly in the cache if needed
-		if !hg.CloneHasTargetRef(cachePath) {
-			if err := hg.SyncClone(cachePath); err != nil {
-				return hgLockConf, fmt.Errorf("Syncing hg cached clone: %w", err)
-			}
-		}
 		// fetch from cachedDir
 		if err := d.cache.CopyFrom("hg", hg.CacheID(), incomingTmpPath); err != nil {
 			return hgLockConf, fmt.Errorf("Extracting cached hg clone: %w", err)
 		}
+		// Sync if needed
+		if !hg.CloneHasTargetRef(cachePath) {
+			if err := hg.SyncClone(incomingTmpPath); err != nil {
+				return hgLockConf, fmt.Errorf("Syncing hg repository: %w", err)
+			}
+			if err := d.cache.Save("hg", hg.CacheID(), incomingTmpPath); err != nil {
+				return hgLockConf, fmt.Errorf("Saving hg repository to cache: %w", err)
+			}
+		}
 	} else {
-		// fetch in the target directory, and save it to cache
+		// fetch in the target directory
 		if err := hg.Clone(incomingTmpPath); err != nil {
 			return hgLockConf, fmt.Errorf("Cloning hg repository: %w", err)
 		}
