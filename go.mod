@@ -2,6 +2,8 @@ module github.com/vmware-tanzu/carvel-vendir
 
 go 1.22
 
+toolchain go1.22.3
+
 require (
 	github.com/bmatcuk/doublestar v1.2.1
 	github.com/carvel-dev/semver/v4 v4.0.1-0.20230221220520-8090ce423695
