@@ -39,7 +39,7 @@ directories:
 		wg := sync.WaitGroup{}
 		for i := 0; i < processes; i++ {
 			wg.Add(1)
-			go func(n int, t *testing.T, wg *sync.WaitGroup) {
+			go func(n int, _ *testing.T, wg *sync.WaitGroup) {
 				defer wg.Done()
 				// RunWithOpts invokes t.Fatal on error
 				vendir.RunWithOpts(

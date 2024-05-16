@@ -18,7 +18,7 @@ func ValidateSymlinks(path string) error {
 		return err
 	}
 	rootSegments := strings.Split(absRoot, string(os.PathSeparator))
-	return filepath.WalkDir(path, func(path string, info fs.DirEntry, err error) error {
+	return filepath.WalkDir(path, func(path string, info fs.DirEntry, _ error) error {
 		if info.Type()&os.ModeSymlink == os.ModeSymlink {
 			resolvedPath, err := filepath.EvalSymlinks(path)
 			if err != nil {
