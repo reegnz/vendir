@@ -77,7 +77,7 @@ func (d StagingDir) CopyExistingFiles(rootDir string, stagingPath string, ignore
 
 	// Consider WalkDir in the future for efficiency (Go 1.16)
 	// Walk root path above to determine files that can be ignored
-	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(rootPath, func(path string, _ os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
