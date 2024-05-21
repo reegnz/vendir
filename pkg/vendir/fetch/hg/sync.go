@@ -46,38 +46,38 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea) (ctlconf.LockDire
 
 	defer os.RemoveAll(incomingTmpPath)
 
-	hg, err := NewHg(d.opts, d.log, d.refFetcher, tempArea)
+	hg, err := newHg(d.opts, d.log, d.refFetcher, tempArea)
 	if err != nil {
 		return hgLockConf, fmt.Errorf("Setting up hg: %w", err)
 	}
 	defer hg.Close()
 
-	if cachePath, ok := d.cache.Has("hg", hg.CacheID()); ok {
+	if cachePath, ok := d.cache.Has("hg", hg.getCacheID()); ok {
 		// fetch from cachedDir
-		if err := d.cache.CopyFrom("hg", hg.CacheID(), incomingTmpPath); err != nil {
+		if err := d.cache.CopyFrom("hg", hg.getCacheID(), incomingTmpPath); err != nil {
 			return hgLockConf, fmt.Errorf("Extracting cached hg clone: %w", err)
 		}
 		// Sync if needed
-		if !hg.CloneHasTargetRef(cachePath) {
-			if err := hg.SyncClone(incomingTmpPath); err != nil {
+		if !hg.cloneHasTargetRef(cachePath) {
+			if err := hg.syncClone(incomingTmpPath); err != nil {
 				return hgLockConf, fmt.Errorf("Syncing hg repository: %w", err)
 			}
-			if err := d.cache.Save("hg", hg.CacheID(), incomingTmpPath); err != nil {
+			if err := d.cache.Save("hg", hg.getCacheID(), incomingTmpPath); err != nil {
 				return hgLockConf, fmt.Errorf("Saving hg repository to cache: %w", err)
 			}
 		}
 	} else {
 		// fetch in the target directory
-		if err := hg.Clone(incomingTmpPath); err != nil {
+		if err := hg.clone(incomingTmpPath); err != nil {
 			return hgLockConf, fmt.Errorf("Cloning hg repository: %w", err)
 		}
-		if err := d.cache.Save("hg", hg.CacheID(), incomingTmpPath); err != nil {
+		if err := d.cache.Save("hg", hg.getCacheID(), incomingTmpPath); err != nil {
 			return hgLockConf, fmt.Errorf("Saving hg repository to cache: %w", err)
 		}
 	}
 
 	// now checkout the wanted revision
-	info, err := hg.Checkout(incomingTmpPath)
+	info, err := hg.checkout(incomingTmpPath)
 	if err != nil {
 		return hgLockConf, fmt.Errorf("Checking out hg repository: %s", err)
 	}

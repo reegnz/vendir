@@ -19,7 +19,7 @@ import (
 	ctlfetch "carvel.dev/vendir/pkg/vendir/fetch"
 )
 
-type Hg struct {
+type hg struct {
 	opts       ctlconf.DirectoryContentsHg
 	infoLog    io.Writer
 	refFetcher ctlfetch.RefFetcher
@@ -28,34 +28,34 @@ type Hg struct {
 	cacheID    string
 }
 
-func NewHg(opts ctlconf.DirectoryContentsHg,
+func newHg(opts ctlconf.DirectoryContentsHg,
 	infoLog io.Writer, refFetcher ctlfetch.RefFetcher,
 	tempArea ctlfetch.TempArea,
-) (*Hg, error) {
-	t := Hg{opts, infoLog, refFetcher, "", nil, ""}
+) (*hg, error) {
+	t := hg{opts, infoLog, refFetcher, "", nil, ""}
 	if err := t.setup(tempArea); err != nil {
 		return nil, err
 	}
 	return &t, nil
 }
 
-// CacheID returns a cache id for the repository
+// getCacheID returns a cache id for the repository
 // It doesn't include the ref because we want to reuse a cache when only the ref
 // is changed
 // Basically we combine all data used to write the hgrc file
-func (t *Hg) CacheID() string {
+func (t *hg) getCacheID() string {
 	return t.cacheID
 }
 
 //nolint:revive
-type HgInfo struct {
+type hgInfo struct {
 	SHA            string
 	ChangeSetTitle string
 }
 
-// CloneHasTargetRef returns true if the given clone contains the target
+// cloneHasTargetRef returns true if the given clone contains the target
 // ref, and this ref is a revision id (not a tag or a branch)
-func (t *Hg) CloneHasTargetRef(dstPath string) bool {
+func (t *hg) cloneHasTargetRef(dstPath string) bool {
 	out, _, err := t.run([]string{"id", "--id", "-r", t.opts.Ref}, dstPath)
 	if err != nil {
 		return false
@@ -67,21 +67,21 @@ func (t *Hg) CloneHasTargetRef(dstPath string) bool {
 	return false
 }
 
-func (t *Hg) Clone(dstPath string) error {
+func (t *hg) clone(dstPath string) error {
 	if err := t.initClone(dstPath); err != nil {
 		return err
 	}
-	return t.SyncClone(dstPath)
+	return t.syncClone(dstPath)
 }
 
-func (t *Hg) SyncClone(dstPath string) error {
+func (t *hg) syncClone(dstPath string) error {
 	if _, _, err := t.run([]string{"pull"}, dstPath); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *Hg) LocalClone(localClone, dstPath string) error {
+func (t *hg) localClone(localClone, dstPath string) error {
 	if err := t.initClone(dstPath); err != nil {
 		return err
 	}
@@ -91,24 +91,24 @@ func (t *Hg) LocalClone(localClone, dstPath string) error {
 	return nil
 }
 
-func (t *Hg) Checkout(dstPath string) (HgInfo, error) {
+func (t *hg) checkout(dstPath string) (hgInfo, error) {
 	if _, _, err := t.run([]string{"checkout", t.opts.Ref}, dstPath); err != nil {
-		return HgInfo{}, err
+		return hgInfo{}, err
 	}
 
-	info := HgInfo{}
+	info := hgInfo{}
 
 	// use hg log to retrieve full cset sha
 	out, _, err := t.run([]string{"log", "-r", ".", "-T", "{node}"}, dstPath)
 	if err != nil {
-		return HgInfo{}, err
+		return hgInfo{}, err
 	}
 
 	info.SHA = strings.TrimSpace(out)
 
 	out, _, err = t.run([]string{"log", "-l", "1", "-T", "{desc|firstline|strip}", "-r", info.SHA}, dstPath)
 	if err != nil {
-		return HgInfo{}, err
+		return hgInfo{}, err
 	}
 
 	info.ChangeSetTitle = strings.TrimSpace(out)
@@ -116,14 +116,14 @@ func (t *Hg) Checkout(dstPath string) (HgInfo, error) {
 	return info, nil
 }
 
-func (t *Hg) Close() {
+func (t *hg) Close() {
 	if t.authDir != "" {
 		os.RemoveAll(t.authDir)
 		t.authDir = ""
 	}
 }
 
-func (t *Hg) setup(tempArea ctlfetch.TempArea) error {
+func (t *hg) setup(tempArea ctlfetch.TempArea) error {
 	if len(t.opts.URL) == 0 {
 		return fmt.Errorf("Expected non-empty URL")
 	}
@@ -215,7 +215,7 @@ hgauth.password = %s
 	return nil
 }
 
-func (t *Hg) initClone(dstPath string) error {
+func (t *hg) initClone(dstPath string) error {
 	hgURL := t.opts.URL
 
 	if _, _, err := t.run([]string{"init"}, dstPath); err != nil {
@@ -233,7 +233,7 @@ func (t *Hg) initClone(dstPath string) error {
 	return nil
 }
 
-func (t *Hg) run(args []string, dstPath string) (string, string, error) {
+func (t *hg) run(args []string, dstPath string) (string, string, error) {
 	var stdoutBs, stderrBs bytes.Buffer
 
 	cmd := exec.Command("hg", args...)
@@ -263,7 +263,7 @@ func (o hgAuthOpts) IsPresent() bool {
 	return o.PrivateKey != nil || o.KnownHosts != nil || o.Username != nil || o.Password != nil
 }
 
-func (t *Hg) getAuthOpts() (hgAuthOpts, error) {
+func (t *hg) getAuthOpts() (hgAuthOpts, error) {
 	var opts hgAuthOpts
 
 	if t.opts.SecretRef != nil {
