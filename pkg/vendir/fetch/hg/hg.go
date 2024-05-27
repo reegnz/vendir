@@ -81,16 +81,6 @@ func (t *hg) syncClone(dstPath string) error {
 	return nil
 }
 
-func (t *hg) localClone(localClone, dstPath string) error {
-	if err := t.initClone(dstPath); err != nil {
-		return err
-	}
-	if _, _, err := t.run([]string{"pull", localClone}, dstPath); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (t *hg) checkout(dstPath string) (hgInfo, error) {
 	if _, _, err := t.run([]string{"checkout", t.opts.Ref}, dstPath); err != nil {
 		return hgInfo{}, err
