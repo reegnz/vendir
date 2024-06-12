@@ -5,6 +5,8 @@ package hg
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/url"
@@ -21,12 +23,28 @@ type Hg struct {
 	opts       ctlconf.DirectoryContentsHg
 	infoLog    io.Writer
 	refFetcher ctlfetch.RefFetcher
+	authDir    string
+	env        []string
+	cacheID    string
 }
 
 func NewHg(opts ctlconf.DirectoryContentsHg,
-	infoLog io.Writer, refFetcher ctlfetch.RefFetcher) *Hg {
+	infoLog io.Writer, refFetcher ctlfetch.RefFetcher,
+	tempArea ctlfetch.TempArea,
+) (*Hg, error) {
+	t := Hg{opts, infoLog, refFetcher, "", nil, ""}
+	if err := t.setup(tempArea); err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
 
-	return &Hg{opts, infoLog, refFetcher}
+// getCacheID returns a cache id for the repository
+// It doesn't include the ref because we want to reuse a cache when only the ref
+// is changed
+// Basically we combine all data used to write the hgrc file
+func (t *Hg) getCacheID() string {
+	return t.cacheID
 }
 
 //nolint:revive
@@ -35,27 +53,50 @@ type HgInfo struct {
 	ChangeSetTitle string
 }
 
-func (t *Hg) Retrieve(dstPath string, tempArea ctlfetch.TempArea) (HgInfo, error) {
-	if len(t.opts.URL) == 0 {
-		return HgInfo{}, fmt.Errorf("Expected non-empty URL")
-	}
-
-	err := t.fetch(dstPath, tempArea)
+// cloneHasTargetRef returns true if the given clone contains the target
+// ref, and this ref is a revision id (not a tag or a branch)
+func (t *Hg) cloneHasTargetRef(dstPath string) bool {
+	out, _, err := t.run([]string{"id", "--id", "-r", t.opts.Ref}, dstPath)
 	if err != nil {
+		return false
+	}
+	out = strings.TrimSpace(out)
+	if strings.HasPrefix(t.opts.Ref, out) {
+		return true
+	}
+	return false
+}
+
+func (t *Hg) clone(dstPath string) error {
+	if err := t.initClone(dstPath); err != nil {
+		return err
+	}
+	return t.syncClone(dstPath)
+}
+
+func (t *Hg) syncClone(dstPath string) error {
+	if _, _, err := t.run([]string{"pull"}, dstPath); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *Hg) checkout(dstPath string) (HgInfo, error) {
+	if _, _, err := t.run([]string{"checkout", t.opts.Ref}, dstPath); err != nil {
 		return HgInfo{}, err
 	}
 
 	info := HgInfo{}
 
 	// use hg log to retrieve full cset sha
-	out, _, err := t.run([]string{"log", "-r", ".", "-T", "{node}"}, nil, dstPath)
+	out, _, err := t.run([]string{"log", "-r", ".", "-T", "{node}"}, dstPath)
 	if err != nil {
 		return HgInfo{}, err
 	}
 
 	info.SHA = strings.TrimSpace(out)
 
-	out, _, err = t.run([]string{"log", "-l", "1", "-T", "{desc|firstline|strip}", "-r", info.SHA}, nil, dstPath)
+	out, _, err = t.run([]string{"log", "-l", "1", "-T", "{desc|firstline|strip}", "-r", info.SHA}, dstPath)
 	if err != nil {
 		return HgInfo{}, err
 	}
@@ -65,7 +106,20 @@ func (t *Hg) Retrieve(dstPath string, tempArea ctlfetch.TempArea) (HgInfo, error
 	return info, nil
 }
 
-func (t *Hg) fetch(dstPath string, tempArea ctlfetch.TempArea) error {
+func (t *Hg) Close() {
+	if t.authDir != "" {
+		os.RemoveAll(t.authDir)
+		t.authDir = ""
+	}
+}
+
+func (t *Hg) setup(tempArea ctlfetch.TempArea) error {
+	if len(t.opts.URL) == 0 {
+		return fmt.Errorf("Expected non-empty URL")
+	}
+
+	cacheID := t.opts.URL
+
 	authOpts, err := t.getAuthOpts()
 	if err != nil {
 		return err
@@ -76,16 +130,11 @@ func (t *Hg) fetch(dstPath string, tempArea ctlfetch.TempArea) error {
 		return err
 	}
 
-	defer os.RemoveAll(authDir)
+	t.authDir = authDir
 
-	env := os.Environ()
+	t.env = os.Environ()
 
 	hgURL := t.opts.URL
-
-	_, _, err = t.run([]string{"init"}, env, dstPath)
-	if err != nil {
-		return err
-	}
 
 	var hgRc string
 
@@ -147,39 +196,38 @@ hgauth.password = %s
 		if err != nil {
 			return fmt.Errorf("Writing %s: %s", hgRcPath, err)
 		}
-		env = append(env, "HGRCPATH="+hgRcPath)
+		t.env = append(t.env, "HGRCPATH="+hgRcPath)
+	}
+
+	sha := sha256.Sum256([]byte(cacheID))
+	t.cacheID = hex.EncodeToString(sha[:])
+
+	return nil
+}
+
+func (t *Hg) initClone(dstPath string) error {
+	hgURL := t.opts.URL
+
+	if _, _, err := t.run([]string{"init"}, dstPath); err != nil {
+		return err
 	}
 
 	repoHgRcPath := filepath.Join(dstPath, ".hg", "hgrc")
 
 	repoHgRc := fmt.Sprintf("[paths]\ndefault = %s\n", hgURL)
 
-	err = os.WriteFile(repoHgRcPath, []byte(repoHgRc), 0600)
-	if err != nil {
+	if err := os.WriteFile(repoHgRcPath, []byte(repoHgRc), 0600); err != nil {
 		return fmt.Errorf("Writing %s: %s", repoHgRcPath, err)
 	}
 
-	return t.runMultiple([][]string{
-		{"pull"},
-		{"checkout", t.opts.Ref},
-	}, env, dstPath)
-}
-
-func (t *Hg) runMultiple(argss [][]string, env []string, dstPath string) error {
-	for _, args := range argss {
-		_, _, err := t.run(args, env, dstPath)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
-func (t *Hg) run(args []string, env []string, dstPath string) (string, string, error) {
+func (t *Hg) run(args []string, dstPath string) (string, string, error) {
 	var stdoutBs, stderrBs bytes.Buffer
 
 	cmd := exec.Command("hg", args...)
-	cmd.Env = env
+	cmd.Env = t.env
 	cmd.Dir = dstPath
 	cmd.Stdout = io.MultiWriter(t.infoLog, &stdoutBs)
 	cmd.Stderr = io.MultiWriter(t.infoLog, &stderrBs)
