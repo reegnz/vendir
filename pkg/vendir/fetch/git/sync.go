@@ -51,14 +51,7 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea, cache ctlcache.Ca
 
 	defer os.RemoveAll(incomingTmpPath)
 
-	sum := sha256.New()
-	if _, err := sum.Write([]byte(d.opts.URL)); err != nil {
-		if err != nil {
-			return gitLockConf, err
-		}
-	}
-
-	cacheID := string(sum.Sum(nil))
+	cacheID := fmt.Sprintf("%x", sha256.Sum256([]byte(d.opts.URL)))
 
 	git := NewGit(d.opts, d.log, d.refFetcher)
 
@@ -66,7 +59,6 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea, cache ctlcache.Ca
 	if cacheEntry, hasCache := cache.Has(gitCacheType, cacheID); hasCache {
 		bundle = filepath.Join(cacheEntry, "bundle")
 	}
-	fmt.Println("We got cache?", cacheID, bundle)
 
 	info, err := git.Retrieve(incomingTmpPath, tempArea, bundle)
 	if err != nil {
@@ -77,7 +69,7 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea, cache ctlcache.Ca
 	gitLockConf.Tags = info.Tags
 	gitLockConf.CommitTitle = d.singleLineCommitTitle(info.CommitTitle)
 
-	if os.Getenv("VENDIR_CACHE_DIR") != "" {
+	if _, ok := cache.(*ctlcache.NoCache); !ok {
 		// attempt to save a bundle to the cache
 		bundleDir, err := tempArea.NewTempDir("bundleCache")
 		if err != nil {
