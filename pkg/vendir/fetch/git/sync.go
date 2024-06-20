@@ -22,12 +22,13 @@ type Sync struct {
 	opts       ctlconf.DirectoryContentsGit
 	log        io.Writer
 	refFetcher ctlfetch.RefFetcher
+	cache      ctlcache.Cache
 }
 
 func NewSync(opts ctlconf.DirectoryContentsGit,
-	log io.Writer, refFetcher ctlfetch.RefFetcher) Sync {
+	log io.Writer, refFetcher ctlfetch.RefFetcher, cache ctlcache.Cache) Sync {
 
-	return Sync{opts, log, refFetcher}
+	return Sync{opts, log, refFetcher, cache}
 }
 
 func (d Sync) Desc() string {
@@ -41,7 +42,7 @@ func (d Sync) Desc() string {
 	return fmt.Sprintf("%s@%s", d.opts.URL, ref)
 }
 
-func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea, cache ctlcache.Cache) (ctlconf.LockDirectoryContentsGit, error) {
+func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea) (ctlconf.LockDirectoryContentsGit, error) {
 	gitLockConf := ctlconf.LockDirectoryContentsGit{}
 
 	incomingTmpPath, err := tempArea.NewTempDir("git")
@@ -56,7 +57,7 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea, cache ctlcache.Ca
 	git := NewGit(d.opts, d.log, d.refFetcher)
 
 	var bundle string
-	if cacheEntry, hasCache := cache.Has(gitCacheType, cacheID); hasCache {
+	if cacheEntry, hasCache := d.cache.Has(gitCacheType, cacheID); hasCache {
 		bundle = filepath.Join(cacheEntry, "bundle")
 	}
 
@@ -69,7 +70,7 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea, cache ctlcache.Ca
 	gitLockConf.Tags = info.Tags
 	gitLockConf.CommitTitle = d.singleLineCommitTitle(info.CommitTitle)
 
-	if _, ok := cache.(*ctlcache.NoCache); !ok {
+	if _, ok := d.cache.(*ctlcache.NoCache); !ok {
 		// attempt to save a bundle to the cache
 		bundleDir, err := tempArea.NewTempDir("bundleCache")
 		if err != nil {
@@ -93,7 +94,7 @@ func (d Sync) Sync(dstPath string, tempArea ctlfetch.TempArea, cache ctlcache.Ca
 		if _, _, err := git.cmdRunner.Run(append([]string{"bundle", "create", bundle}, refs...), nil, incomingTmpPath); err != nil {
 			return gitLockConf, err
 		}
-		if err := cache.Save(gitCacheType, cacheID, bundleDir); err != nil {
+		if err := d.cache.Save(gitCacheType, cacheID, bundleDir); err != nil {
 			return gitLockConf, err
 		}
 	}
