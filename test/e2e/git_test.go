@@ -146,19 +146,14 @@ func TestGitCache(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	gitSrcPath, err := os.MkdirTemp("", "vendir-e2e-git-verify-signed-git-repo")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(gitSrcPath)
 
-	if out, err := exec.Command("tar", "xzvf", "assets/git-repo-signed/asset.tgz", "-C", gitSrcPath).CombinedOutput(); err != nil {
-		t.Fatalf("Unpacking git-repo-signed asset: %s (output: '%s')", err, out)
-	}
+	out, err := exec.Command("tar", "xzvf", "assets/git-repo-signed/asset.tgz", "-C", gitSrcPath).CombinedOutput()
+	require.NoErrorf(t, err, "Unpacking git-repo-signed asset: %s (output: '%s')", err, out)
 
 	dstPath, err := os.MkdirTemp("", "vendir-e2e-git-verify-signed-dst")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(dstPath)
 
 	trustedPubKey := readFile(t, filepath.Join(gitSrcPath, "keys/trusted.pub"))
@@ -208,10 +203,10 @@ directories:
 			},
 		})
 
-	var out hgVendirOutput
-	require.NoError(t, stdoutDec.Decode(&out))
+	var vendirOutput VendirOutput
+	require.NoError(t, stdoutDec.Decode(&vendirOutput))
 
-	for _, l := range out.Lines {
+	for _, l := range vendirOutput.Lines {
 		assert.NotContains(t, l, "unbundle")
 	}
 
@@ -229,15 +224,15 @@ directories:
 			},
 		})
 
-	require.NoError(t, stdoutDec.Decode(&out))
+	require.NoError(t, stdoutDec.Decode(&vendirOutput))
 
 	var unbundled bool
-	for _, l := range out.Lines {
+	for _, l := range vendirOutput.Lines {
 		if strings.Contains(l, "unbundle") {
 			unbundled = true
 		}
 	}
-	assert.True(t, unbundled, "git did not use the cached bundle")
+	require.True(t, unbundled, "git did not use the cached bundle")
 }
 
 func readFile(t *testing.T, path string) string {
