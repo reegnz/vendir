@@ -30,6 +30,13 @@ type RunOpts struct {
 	Env          []string
 }
 
+// VendirOutput allows parsing of the --json vendir output
+type VendirOutput struct {
+	Tables string
+	Blocks []string
+	Lines  []string
+}
+
 func (k Vendir) Run(args []string) string {
 	out, _ := k.RunWithOpts(args, RunOpts{})
 	return out

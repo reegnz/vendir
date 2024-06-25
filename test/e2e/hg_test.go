@@ -25,12 +25,6 @@ type HgAssetInfo struct {
 	ExtraChangeset   string `json:"extra-changeset"`
 }
 
-type hgVendirOutput struct {
-	Tables string
-	Blocks []string
-	Lines  []string
-}
-
 func loadHgAssetInfo(t *testing.T, filename string) HgAssetInfo {
 	t.Helper()
 	f, err := os.Open(filename)
@@ -92,7 +86,7 @@ directories:
 				Env:          []string{"VENDIR_CACHE_DIR=" + cachePath},
 			})
 
-		var out hgVendirOutput
+		var out VendirOutput
 		require.NoError(t, stdoutDec.Decode(&out))
 
 		assert.Contains(t, out.Lines[1], "init")
@@ -114,7 +108,7 @@ directories:
 				Env:          []string{"VENDIR_CACHE_DIR=" + cachePath},
 			})
 
-		var out hgVendirOutput
+		var out VendirOutput
 		require.NoError(t, stdoutDec.Decode(&out))
 
 		for _, line := range out.Lines {
@@ -145,7 +139,7 @@ directories:
 				Env:          []string{"VENDIR_CACHE_DIR=" + cachePath},
 			})
 
-		var out hgVendirOutput
+		var out VendirOutput
 		require.NoError(t, stdoutDec.Decode(&out))
 
 		assert.Contains(t, out.Lines[3], "pull")
