@@ -4,7 +4,9 @@
 package e2e
 
 import (
+	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGitVerification(t *testing.T) {
@@ -131,6 +134,110 @@ directories:
 		_, err = os.Stat(filepath.Join(dstPath, "vendor", "test", "carvel-vendir"))
 		assert.NoError(t, err)
 	})
+}
+
+func TestGitCache(t *testing.T) {
+	env := BuildEnv(t)
+	logger := Logger{}
+	vendir := Vendir{t, env.BinaryPath, logger}
+
+	tmpDir, err := os.MkdirTemp("", "vendir-e2e-git-verify-signed-git-repo")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	gitSrcPath, err := os.MkdirTemp("", "vendir-e2e-git-verify-signed-git-repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(gitSrcPath)
+
+	if out, err := exec.Command("tar", "xzvf", "assets/git-repo-signed/asset.tgz", "-C", gitSrcPath).CombinedOutput(); err != nil {
+		t.Fatalf("Unpacking git-repo-signed asset: %s (output: '%s')", err, out)
+	}
+
+	dstPath, err := os.MkdirTemp("", "vendir-e2e-git-verify-signed-dst")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dstPath)
+
+	trustedPubKey := readFile(t, filepath.Join(gitSrcPath, "keys/trusted.pub"))
+
+	yamlConfigWithPubKeys := func(ref string, pubKeys string) io.Reader {
+		encodedPubKeys := base64.StdEncoding.EncodeToString([]byte(pubKeys))
+		repoPath := filepath.Join(gitSrcPath, "git-repo")
+		return strings.NewReader(fmt.Sprintf(`
+apiVersion: v1
+kind: Secret
+metadata:
+  name: git-pubs
+data:
+  valid.pub: "%s"
+---
+apiVersion: vendir.k14s.io/v1alpha1
+kind: Config
+directories:
+- path: vendor
+  contents:
+  - path: test
+    git:
+      url: "%s"
+      ref: "%s"
+      verification:
+        publicKeysSecretRef:
+          name: git-pubs
+`, encodedPubKeys, repoPath, ref))
+	}
+
+	yamlConfig := func(ref string) io.Reader {
+		return yamlConfigWithPubKeys(ref, trustedPubKey)
+	}
+
+	var stdout bytes.Buffer
+	stdoutDec := json.NewDecoder(&stdout)
+
+	vendir.RunWithOpts(
+		[]string{"sync", "-f", "-", "--json"},
+		RunOpts{
+			Dir:          dstPath,
+			StdinReader:  yamlConfig("signed-trusted-tag"),
+			StdoutWriter: &stdout,
+			Env: []string{
+				"VENDIR_CACHE_DIR=" + tmpDir,
+				"VENDIR_CACHE_MAX_SIZE=10M",
+			},
+		})
+
+	var out hgVendirOutput
+	require.NoError(t, stdoutDec.Decode(&out))
+
+	for _, l := range out.Lines {
+		assert.NotContains(t, l, "unbundle")
+	}
+
+	stdout.Truncate(0)
+
+	vendir.RunWithOpts(
+		[]string{"sync", "-f", "-", "--json"},
+		RunOpts{
+			Dir:          dstPath,
+			StdinReader:  yamlConfig("signed-trusted-tag"),
+			StdoutWriter: &stdout,
+			Env: []string{
+				"VENDIR_CACHE_DIR=" + tmpDir,
+				"VENDIR_CACHE_MAX_SIZE=10M",
+			},
+		})
+
+	require.NoError(t, stdoutDec.Decode(&out))
+
+	var unbundled bool
+	for _, l := range out.Lines {
+		if strings.Contains(l, "unbundle") {
+			unbundled = true
+		}
+	}
+	assert.True(t, unbundled, "git did not use the cached bundle")
 }
 
 func readFile(t *testing.T, path string) string {
