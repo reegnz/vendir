@@ -1,22 +1,22 @@
 module carvel.dev/vendir
 
-go 1.22.3
+go 1.22.5
 
 require (
-	carvel.dev/imgpkg v0.42.0
+	carvel.dev/imgpkg v0.43.0
 	github.com/bmatcuk/doublestar v1.2.1
 	github.com/carvel-dev/semver/v4 v4.0.1-0.20240402203627-beb83fbf25e4
 	github.com/cppforlife/cobrautil v0.0.0-20221021151949-d60711905d65
 	github.com/cppforlife/go-cli-ui v0.0.0-20220425131040-94f26b16bc14
 	github.com/gogo/protobuf v1.3.2
-	github.com/google/go-containerregistry v0.19.1
+	github.com/google/go-containerregistry v0.20.0
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/hashicorp/go-version v1.2.1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/otiai10/copy v1.2.0
 	github.com/phayes/freeport v0.0.0-20220201140144-74d24b5ae9f5
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/crypto v0.21.0
 	golang.org/x/oauth2 v0.8.0
@@ -99,7 +99,7 @@ require (
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485 // indirect

@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"carvel.dev/imgpkg/pkg/imgpkg/bundle"
+	"carvel.dev/imgpkg/pkg/imgpkg/imageset"
 	"carvel.dev/imgpkg/pkg/imgpkg/lockconfig"
 	"carvel.dev/imgpkg/pkg/imgpkg/registry"
 	"carvel.dev/imgpkg/pkg/imgpkg/signature"
@@ -78,6 +79,7 @@ type DescribeOpts struct {
 // SignatureFetcher Interface to retrieve signatures associated with Images
 type SignatureFetcher interface {
 	FetchForImageRefs(images []lockconfig.ImageRef) ([]lockconfig.ImageRef, error)
+	Fetch(images *imageset.UnprocessedImageRefs) (*imageset.UnprocessedImageRefs, error)
 }
 
 // Describe Given a Bundle URL fetch the information about the contents of the Bundle and Nested Bundles
@@ -141,7 +143,7 @@ func (r *refWithDescription) describeBundleRec(visitedImgs map[string]refWithDes
 	}
 
 	if showLayers {
-		layers, err = getImageLayersInfo(currentBundle.Image)
+		layers, err = getImageLayersInfo(currentBundle.PrimaryLocation())
 		if err != nil {
 			return desc.bundle, err
 		}
