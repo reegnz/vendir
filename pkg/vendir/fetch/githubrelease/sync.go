@@ -244,11 +244,13 @@ func (d Sync) fetchTagSelection() (string, error) {
 		tagList, resp, err := d.client.Repositories.ListTags(context.Background(), ownerName, repoName, &listOpt)
 		if err != nil {
 			errMsg := err.Error()
-			switch resp.StatusCode {
-			case 401, 403:
-				hintMsg := "(hint: consider setting VENDIR_GITHUB_API_TOKEN env variable to increase API rate limits)"
-				bs, _ := io.ReadAll(resp.Body)
-				errMsg += fmt.Sprintf(" %s (body: '%s')", hintMsg, bs)
+			if resp != nil {
+				switch resp.StatusCode {
+				case 401, 403:
+					hintMsg := "(hint: consider setting VENDIR_GITHUB_API_TOKEN env variable to increase API rate limits)"
+					bs, _ := io.ReadAll(resp.Body)
+					errMsg += fmt.Sprintf(" %s (body: '%s')", hintMsg, bs)
+				}
 			}
 			return "", fmt.Errorf("Downloading tags info: %s", errMsg)
 		}
