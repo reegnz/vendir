@@ -435,7 +435,7 @@ func (d Sync) authToken() (string, error) {
 		}
 	}
 
-	return token, nil
+	return strings.TrimSpace(token), nil
 }
 
 type ReleaseAPI struct {
