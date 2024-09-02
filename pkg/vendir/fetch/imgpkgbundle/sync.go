@@ -19,9 +19,10 @@ type Sync struct {
 
 func NewSync(opts ctlconf.DirectoryContentsImgpkgBundle, refFetcher ctlfetch.RefFetcher, c ctlcache.Cache) *Sync {
 	imgpkgOpts := ctlimg.ImgpkgOpts{
-		SecretRef:              opts.SecretRef,
-		DangerousSkipTLSVerify: opts.DangerousSkipTLSVerify,
-		ResponseHeaderTimeout:  opts.ResponseHeaderTimeout,
+		SecretRef:                opts.SecretRef,
+		DangerousSkipTLSVerify:   opts.DangerousSkipTLSVerify,
+		ResponseHeaderTimeout:    opts.ResponseHeaderTimeout,
+		AdditionalCACertificates: opts.AdditionalCACertificates,
 	}
 	return &Sync{opts, ctlimg.NewImgpkg(imgpkgOpts, refFetcher, c)}
 }

@@ -139,6 +139,9 @@ type DirectoryContentsImgpkgBundle struct {
 	ResponseHeaderTimeout  int  `json:"responseHeaderTimeout,omitempty"`
 	DangerousSkipTLSVerify bool `json:"dangerousSkipTLSVerify,omitempty"`
 	Recursive              bool `json:"recursive,omitempty"`
+	// Paths to PEM files containing additional CA certificates
+	// +optional
+	AdditionalCACertificates []string `json:"additionalCACertificates,omitempty"`
 }
 
 func (c DirectoryContentsImgpkgBundle) PreresolvedTag() string { return c.preresolvedTag }
