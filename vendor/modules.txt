@@ -1,4 +1,4 @@
-# carvel.dev/imgpkg v0.43.0
+# carvel.dev/imgpkg v0.43.1
 ## explicit; go 1.22.5
 carvel.dev/imgpkg/pkg/imgpkg/bundle
 carvel.dev/imgpkg/pkg/imgpkg/image
@@ -183,7 +183,7 @@ github.com/davecgh/go-spew/spew
 # github.com/dimchansky/utfbom v1.1.0
 ## explicit
 github.com/dimchansky/utfbom
-# github.com/docker/cli v25.0.5+incompatible
+# github.com/docker/cli v25.0.6+incompatible
 ## explicit
 github.com/docker/cli/cli/config
 github.com/docker/cli/cli/config/configfile
@@ -192,7 +192,7 @@ github.com/docker/cli/cli/config/types
 # github.com/docker/distribution v2.8.2+incompatible
 ## explicit
 github.com/docker/distribution/registry/client/auth/challenge
-# github.com/docker/docker v25.0.5+incompatible
+# github.com/docker/docker v25.0.6+incompatible
 ## explicit
 github.com/docker/docker/pkg/homedir
 # github.com/docker/docker-credential-helpers v0.7.0
