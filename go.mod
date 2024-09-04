@@ -3,7 +3,7 @@ module carvel.dev/vendir
 go 1.22
 
 require (
-	carvel.dev/imgpkg v0.42.2
+	carvel.dev/imgpkg v0.42.3
 	github.com/bmatcuk/doublestar v1.2.1
 	github.com/carvel-dev/semver/v4 v4.0.1-0.20240402203627-beb83fbf25e4
 	github.com/cppforlife/cobrautil v0.0.0-20221021151949-d60711905d65
@@ -60,9 +60,9 @@ require (
 	github.com/cppforlife/color v1.9.1-0.20200716202919-6706ac40b835 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.0 // indirect
-	github.com/docker/cli v25.0.5+incompatible // indirect
+	github.com/docker/cli v25.0.6+incompatible // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
-	github.com/docker/docker v25.0.5+incompatible // indirect
+	github.com/docker/docker v25.0.6+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.7.0 // indirect
 	github.com/emicklei/go-restful v2.16.0+incompatible // indirect
 	github.com/fatih/color v1.15.0 // indirect
