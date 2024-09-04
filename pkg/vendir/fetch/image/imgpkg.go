@@ -24,9 +24,10 @@ const (
 )
 
 type ImgpkgOpts struct {
-	SecretRef              *ctlconf.DirectoryContentsLocalRef
-	DangerousSkipTLSVerify bool
-	ResponseHeaderTimeout  int
+	SecretRef                *ctlconf.DirectoryContentsLocalRef
+	DangerousSkipTLSVerify   bool
+	ResponseHeaderTimeout    int
+	AdditionalCACertificates []string
 
 	EnvironFunc func() []string
 }
@@ -164,6 +165,7 @@ func (t *Imgpkg) RegistryOpts() (registry.Opts, error) {
 		EnvironFunc: func() []string {
 			return append(envVariables, t.opts.EnvironFunc()...)
 		},
+		CACertPaths: t.opts.AdditionalCACertificates,
 	}
 	envVars := map[string]string{}
 	for _, envVar := range append(envVariables, t.opts.EnvironFunc()...) {
